@@ -1,12 +1,11 @@
 /* Читанка — service worker: оболонка застосунку працює без інтернету.
    Книжки й аудіо сюди не потрапляють: їх кешує сама сторінка (Cache Storage «chitanka-files-*»),
    запити до Google (googleapis.com) не перехоплюються. */
-const SHELL_CACHE = 'chitanka-shell-20261109-fwd30';
+const SHELL_CACHE = 'chitanka-shell-20261109-usersite';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/config.js', 'js/labels.js', 'js/store.js', 'js/data-demo.js', 'js/data-drive.js', 'js/player.js', 'js/app.js',
-  'img/banner-phone.jpg', 'audio/silence.mp3',
-  'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/favicon-32.png'
+  'icons/icon.svg'
 ];
 const SCOPE = new URL(self.registration.scope).pathname;
 

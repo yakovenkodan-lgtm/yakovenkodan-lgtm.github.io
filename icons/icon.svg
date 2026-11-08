@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#f4c27a"/>
+  <rect x="118" y="96" width="276" height="332" rx="24" fill="#fff8ee"/>
+  <rect x="246" y="96" width="16" height="332" fill="#e8b86a"/>
+  <text x="256" y="310" text-anchor="middle" font-family="Georgia, serif" font-size="180" fill="#8a5a22">Ч</text>
+</svg>

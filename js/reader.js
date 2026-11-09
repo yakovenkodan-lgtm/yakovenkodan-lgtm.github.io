@@ -1,6 +1,8 @@
 (function () {
   'use strict';
-  var KEY = 'chitanka.photo.v1';
+  var KEY = 'chitanka.pdf.v1';
+  var PDF_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  var PDF_CMAP = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/';
   var $ = function (id) { return document.getElementById(id); };
   var state = { title: 'Моя книжка', pages: [], idx: 0, bookmark: 0 };
   var speak = { start: 0, pos: 0, utter: null, playing: false };
@@ -11,6 +13,10 @@
     localStorage.removeItem('chitanka.oauthState');
     localStorage.removeItem('chitanka.driveRoot');
   } catch (e) {}
+
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER;
+  }
 
   function load() {
     try {
@@ -30,7 +36,7 @@
     try {
       localStorage.setItem(KEY, JSON.stringify({
         title: state.title,
-        pages: state.pages,
+        pages: state.pages.map(function (p) { return { id: p.id, text: p.text || '', createdAt: p.createdAt }; }),
         idx: state.idx,
         bookmark: state.bookmark
       }));
@@ -69,7 +75,7 @@
     var text = page && page.text ? page.text : '';
     if (!text) { toast('На цій сторінці ще немає тексту.'); return; }
     if (!window.speechSynthesis) {
-      toast('Надішли фото мені в чат — прочитаю вголос.');
+      toast('На цій сторінці натисни «Прослухати» ще раз, або надішли PDF мені в чат.');
       return;
     }
     stopSpeak();
@@ -118,7 +124,7 @@
     else { img.hidden = true; img.removeAttribute('src'); }
     box.textContent = '';
     if (!page.text) {
-      box.appendChild(document.createTextNode('Тут не видно тексту. Надішли це фото мені в чат — розпізнаю і прочитаю вголос.'));
+      box.appendChild(document.createTextNode('Тут не видно тексту. Ця сторінка схожа на малюнок без букв.'));
     } else {
       page.text.split(/\n\s*\n/).forEach(function (para) {
         var t = para.trim();
@@ -133,6 +139,7 @@
   function go(d) {
     if (!state.pages.length) return;
     stopSpeak();
+    speak.pos = 0;
     state.idx = Math.max(0, Math.min(state.pages.length - 1, state.idx + d));
     save();
     render();
@@ -140,108 +147,146 @@
 
   function estimateChars(sec) { return Math.round(sec * 12); }
 
-  async function loadBitmap(file) {
-    if (window.createImageBitmap) {
-      try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) {}
+  function itemsToText(items) {
+    var lines = [];
+    var buf = [];
+    var lastY = null;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      var y = it.transform ? it.transform[5] : 0;
+      if (lastY != null && Math.abs(y - lastY) > 6 && buf.length) {
+        lines.push(buf.join(''));
+        buf = [];
+      }
+      var s = it.str || '';
+      if (buf.length && s && !/ $/.test(buf[buf.length - 1]) && !/^ |^[,.;:!?»)\]-]/.test(s)) buf.push(' ');
+      buf.push(s);
+      lastY = y;
+      if (it.hasEOL) {
+        lines.push(buf.join(''));
+        buf = [];
+        lastY = null;
+      }
     }
-    return new Promise(function (ok, bad) {
-      var url = URL.createObjectURL(file);
-      var im = new Image();
-      im.onload = function () { URL.revokeObjectURL(url); ok(im); };
-      im.onerror = function () { URL.revokeObjectURL(url); bad(new Error('image')); };
-      im.src = url;
-    });
+    if (buf.length) lines.push(buf.join(''));
+    return lines.join('\n').replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
   }
 
-  function drawSized(source, max) {
-    var w = source.width, h = source.height;
-    if (!w || !h) return null;
-    var scale = Math.min(1, max / Math.max(w, h));
-    var cw = Math.max(1, Math.round(w * scale));
-    var ch = Math.max(1, Math.round(h * scale));
+  function hasText(s) {
+    return /[A-Za-zА-Яа-яІіЇїЄєҐґЁёЫыЭэЪъ]{8,}/.test(s || '');
+  }
+
+  function titleFromName(name) {
+    return String(name || '').replace(/\.pdf$/i, '').trim() || 'Моя книжка';
+  }
+
+  async function ocrCanvas(canvas, onProgress) {
+    if (!window.Tesseract) return '';
+    var result = await Tesseract.recognize(canvas, 'rus+ukr', {
+      logger: function (m) {
+        if (m && m.status === 'recognizing text' && typeof m.progress === 'number') onProgress(m.progress);
+      }
+    });
+    return ((result && result.data && result.data.text) || '').replace(/\u000c/g, '').trim();
+  }
+
+  async function renderPageCanvas(page, scale) {
+    var viewport = page.getViewport({ scale: scale || 1.4 });
     var canvas = document.createElement('canvas');
-    canvas.width = cw; canvas.height = ch;
-    canvas.getContext('2d').drawImage(source, 0, 0, cw, ch);
+    canvas.width = Math.max(1, Math.round(viewport.width));
+    canvas.height = Math.max(1, Math.round(viewport.height));
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
     return canvas;
   }
 
-  async function recognize(file, onProgress) {
-    var bmp = await loadBitmap(file);
-    var work = drawSized(bmp, 1600);
-    var preview = drawSized(bmp, 720);
-    if (bmp.close) try { bmp.close(); } catch (e) {}
-    var image = preview ? preview.toDataURL('image/jpeg', 0.7) : '';
-    var text = '';
-    if (window.Tesseract && work) {
-      var result = await Tesseract.recognize(work, 'rus+ukr', {
-        logger: function (m) {
-          if (m && m.status === 'recognizing text' && typeof m.progress === 'number') onProgress(m.progress);
-        }
+  async function readPdf(file, onStatus) {
+    if (!window.pdfjsLib) throw new Error('no-pdfjs');
+    var buf = await file.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({
+      data: buf,
+      cMapUrl: PDF_CMAP,
+      cMapPacked: true
+    }).promise;
+    var out = [];
+    for (var i = 1; i <= pdf.numPages; i++) {
+      onStatus('Читаю PDF: сторінка ' + i + ' з ' + pdf.numPages + '…');
+      var page = await pdf.getPage(i);
+      var content = await page.getTextContent();
+      var text = itemsToText(content.items || []);
+      if (!hasText(text)) {
+        onStatus('Розпізнаю сторінку ' + i + ' з ' + pdf.numPages + '…');
+        try {
+          var canvas = await renderPageCanvas(page, 1.5);
+          text = await ocrCanvas(canvas, function (p) {
+            onStatus('Розпізнаю сторінку ' + i + ' з ' + pdf.numPages + '… ' + Math.round(p * 100) + '%');
+          });
+        } catch (e) {}
+      }
+      out.push({
+        id: Date.now() + '-' + i,
+        text: text || '',
+        createdAt: Date.now()
       });
-      text = ((result && result.data && result.data.text) || '').replace(/\u000c/g, '').trim();
     }
-    return { text: text, image: image };
+    return out;
   }
 
   async function addFiles(files) {
-    files = Array.prototype.filter.call(files || [], function (f) { return f && f.type && f.type.indexOf('image/') === 0; });
-    if (!files.length) { toast('Обери фото сторінки.'); return; }
+    files = Array.prototype.filter.call(files || [], function (f) {
+      var name = (f && f.name || '').toLowerCase();
+      return f && (f.type === 'application/pdf' || name.endsWith('.pdf'));
+    });
+    if (!files.length) { toast('Обери файл PDF.'); return; }
     var status = $('status');
     status.hidden = false;
-    $('filePages').disabled = true;
+    $('filePdf').disabled = true;
     for (var i = 0; i < files.length; i++) {
-      status.textContent = 'Розпізнаю ' + (i + 1) + ' з ' + files.length + '…';
+      status.textContent = 'Відкриваю PDF…';
       try {
-        var page = await recognize(files[i], function (p) {
-          status.textContent = 'Розпізнаю ' + (i + 1) + ' з ' + files.length + '… ' + Math.round(p * 100) + '%';
-        });
-        state.pages.push({ id: Date.now() + '-' + i, text: page.text, image: page.image, createdAt: Date.now() });
-        state.idx = state.pages.length - 1;
+        var pages = await readPdf(files[i], function (msg) { status.textContent = msg; });
+        if (!state.pages.length || state.title === 'Моя книжка') state.title = titleFromName(files[i].name);
+        state.pages = state.pages.concat(pages);
+        state.idx = Math.max(0, state.pages.length - pages.length);
         save();
         render();
+        toast('Готово: ' + pages.length + ' стор. Можна читати або слухати.');
       } catch (e) {
-        state.pages.push({ id: Date.now() + '-' + i, text: '', image: '', createdAt: Date.now() });
-        state.idx = state.pages.length - 1;
-        save();
-        render();
-        toast('Цю сторінку не вдалося розпізнати. Надішли фото мені в чат.');
+        toast('Цей PDF не вдалося відкрити. Спробуй інший файл.');
       }
     }
     status.hidden = true;
-    $('filePages').disabled = false;
-    $('filePages').value = '';
-    if (state.pages.length) toast('Готово. Можна читати або слухати.');
+    $('filePdf').disabled = false;
+    $('filePdf').value = '';
   }
 
   $('bookTitle').addEventListener('change', function () {
     state.title = ($('bookTitle').value || 'Моя книжка').trim() || 'Моя книжка';
     save();
   });
-  $('filePages').addEventListener('change', function (e) { addFiles(e.target.files); });
+  $('filePdf').addEventListener('change', function (e) { addFiles(e.target.files); });
   $('bPrev').addEventListener('click', function () { go(-1); });
   $('bNext').addEventListener('click', function () { go(1); });
   $('bMark').addEventListener('click', function () {
-    if (!state.pages.length) { toast('Спершу додай фото сторінки.'); return; }
+    if (!state.pages.length) { toast('Спершу додай PDF.'); return; }
     state.bookmark = state.idx;
     save();
     render();
     toast('Закладку поставлено на сторінку ' + (state.idx + 1) + '.');
   });
   $('bListen').addEventListener('click', function () {
-    if (!state.pages.length) { toast('Спершу додай фото сторінки.'); return; }
+    if (!state.pages.length) { toast('Спершу додай PDF.'); return; }
     if (speak.playing) { stopSpeak(); return; }
     speakFrom(speak.pos && speak.pos < ((state.pages[state.idx] || {}).text || '').length ? speak.pos : 0);
   });
   $('bBack').addEventListener('click', function () {
     var text = ((state.pages[state.idx] || {}).text || '');
     if (!text) return;
-    var next = Math.max(0, (speak.playing ? speak.pos : speak.pos) - estimateChars(15));
-    speakFrom(next);
+    speakFrom(Math.max(0, speak.pos - estimateChars(15)));
   });
   $('bFwd').addEventListener('click', function () {
     var text = ((state.pages[state.idx] || {}).text || '');
     if (!text) return;
-    var next = Math.min(text.length, (speak.playing ? speak.pos : speak.pos) + estimateChars(30));
+    var next = Math.min(text.length, speak.pos + estimateChars(30));
     if (next >= text.length) { stopSpeak(); toast('Кінець сторінки.'); return; }
     speakFrom(next);
   });

@@ -1,12 +1,6 @@
-/* Читанка — service worker: оболонка застосунку працює без інтернету.
-   Книжки й аудіо сюди не потрапляють: їх кешує сама сторінка (Cache Storage «chitanka-files-*»),
-   запити до Google (googleapis.com) не перехоплюються. */
-const SHELL_CACHE = 'chitanka-shell-20261109-oauth';
-const SHELL = [
-  './', 'index.html', 'manifest.webmanifest', 'css/app.css',
-  'js/config.js', 'js/labels.js', 'js/store.js', 'js/data-demo.js', 'js/data-drive.js', 'js/player.js', 'js/app.js',
-  'icons/icon.svg'
-];
+/* Читанка — оболонка без Гугла і без Диска. Книжки живуть лише в браузері. */
+const SHELL_CACHE = 'chitanka-shell-20261109-photo';
+const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/reader.css', 'js/reader.js', 'icons/icon.svg'];
 const SCOPE = new URL(self.registration.scope).pathname;
 
 self.addEventListener('install', (e) => {
@@ -23,12 +17,10 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== location.origin || !url.pathname.startsWith(SCOPE) || url.pathname.includes('/__chitanka/')) return;
   if (req.headers.has('range')) return;
   if (req.mode === 'navigate') {
-    // спершу мережа (щоб оновлення доходили), без мережі — збережена сторінка
     e.respondWith(fetch(req).then((r) => { const cp = r.clone(); caches.open(SHELL_CACHE).then((c) => c.put('index.html', cp)); return r; })
       .catch(() => caches.match('index.html', { ignoreSearch: true })));
     return;
   }
-  // решта оболонки: з кешу одразу, а в фоні — свіжа копія
   e.respondWith(caches.open(SHELL_CACHE).then((c) => c.match(req, { ignoreSearch: true }).then((hit) => {
     const net = fetch(req).then((r) => { if (r.ok && r.type === 'basic') c.put(req, r.clone()); return r; }).catch(() => hit);
     return hit || net;

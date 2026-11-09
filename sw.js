@@ -1,7 +1,7 @@
 /* Читанка — service worker: оболонка застосунку працює без інтернету.
    Книжки й аудіо сюди не потрапляють: їх кешує сама сторінка (Cache Storage «chitanka-files-*»),
    запити до Google (googleapis.com) не перехоплюються. */
-const SHELL_CACHE = 'chitanka-shell-20261109-usersite';
+const SHELL_CACHE = 'chitanka-shell-20261109-oauth';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/config.js', 'js/labels.js', 'js/store.js', 'js/data-demo.js', 'js/data-drive.js', 'js/player.js', 'js/app.js',

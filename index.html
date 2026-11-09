@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <title>Читанка</title>
-<meta name="description" content="Читанка: PDF, текст і читання вголос. Без входу.">
+<meta name="description" content="Читанка: файл книжки, текст і читання вголос. Без входу.">
 <meta name="theme-color" content="#fdf1e2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -29,14 +29,14 @@
 <main class="reader" id="reader">
   <img class="preview" id="preview" alt="" hidden>
   <article class="page-text" id="pageText"></article>
-  <p class="empty" id="emptyHint">Відкрий книжку з файлу PDF. Текст береться по сторінках тут, на телефоні, і нікуди не надсилається. Потім можна слухати кнопкою «Прослухати».</p>
+  <p class="empty" id="emptyHint">Відкрий книжку з файлу — PDF або FB2. Текст береться по сторінках тут, на телефоні, і нікуди не надсилається. Потім можна слухати кнопкою «Прослухати».</p>
   <p class="status" id="status" hidden></p>
 </main>
 
 <nav class="bar">
   <label class="btn primary">
-    Додати PDF
-    <input id="filePdf" type="file" accept="application/pdf,.pdf" multiple hidden>
+    Додати файл
+    <input id="fileAny" type="file" accept=".pdf,.fb2,.txt,application/pdf,application/x-fictionbook+xml,text/plain" multiple hidden>
   </label>
   <button type="button" class="btn" id="bListen">Прослухати</button>
   <button type="button" class="btn" id="bBack">−15</button>

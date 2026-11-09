@@ -1,5 +1,5 @@
 /* Читанка — оболонка без Гугла і без Диска. Книжки живуть лише в браузері. */
-const SHELL_CACHE = 'chitanka-shell-20261109-pdf';
+const SHELL_CACHE = 'chitanka-shell-20261109-file';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/reader.css', 'js/reader.js', 'icons/icon.svg'];
 const SCOPE = new URL(self.registration.scope).pathname;
 

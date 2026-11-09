@@ -17,3 +17,5 @@ body { display: flex; flex-direction: column; min-height: 100dvh; padding: env(s
 .btn.primary { background: #3d6b4f; color: #fff; }
 .btn:disabled { opacity: .45; }
 .toast { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); max-width: 90%; padding: 10px 14px; border-radius: 12px; background: #2a2118; color: #fdf1e2; font: 16px/1.3 system-ui, sans-serif; z-index: 5; }
+
+.file-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

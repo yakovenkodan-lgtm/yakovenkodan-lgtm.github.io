@@ -36,7 +36,7 @@
 <nav class="bar">
   <label class="btn primary">
     Додати файл
-    <input id="fileAny" type="file" accept=".pdf,.fb2,.txt,application/pdf,application/x-fictionbook+xml,text/plain" multiple hidden>
+    <input id="fileAny" class="file-sr" type="file" accept=".pdf,.fb2,.txt,.xml,application/pdf,text/plain,application/xml,text/xml" multiple>
   </label>
   <button type="button" class="btn" id="bListen">Прослухати</button>
   <button type="button" class="btn" id="bBack">−15</button>
@@ -48,6 +48,6 @@
 <div class="toast" id="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="js/reader-file.js"></script>
+<script src="js/reader-open.js"></script>
 </body>
 </html>
